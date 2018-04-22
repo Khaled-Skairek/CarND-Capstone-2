@@ -9,4 +9,4 @@ PROJECT_HOME="${SCRIPT_DIR}/../"
 
 echo "Start building a docker image."
 cd "$PROJECT_HOME"  \
-  && docker build -t carnd-capstone:latest .
+  && docker build --rm -t carnd-capstone:latest .
