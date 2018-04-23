@@ -47,10 +47,12 @@ class DBWNode(object):
         max_steer_angle = rospy.get_param('~max_steer_angle', 8.)
         min_speed = 0.1
 
+        # Publishers
         self.steer_pub = rospy.Publisher('/vehicle/steering_cmd', SteeringCmd, queue_size=1)
         self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd', ThrottleCmd, queue_size=1)
         self.brake_pub = rospy.Publisher('/vehicle/brake_cmd', BrakeCmd, queue_size=1)
 
+        # Controller
         self.controller = Controller(vehicle_mass=vehicle_mass,
                                      fuel_capacity=fuel_capacity,
                                      brake_deadband=brake_deadband,
@@ -62,10 +64,12 @@ class DBWNode(object):
                                      max_lat_accel=max_lat_accel,
                                      max_steer_angle=max_steer_angle)
 
+        # Subscribers
         rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb, queue_size=1)
         rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cb, queue_size=2)
         rospy.Subscriber('/current_velocity', TwistStamped, self.velocity_cb, queue_size=5)
 
+        # Variables
         self.current_vel = None
         self.curr_ang_vel = None
         self.dbw_enabled = None

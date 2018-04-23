@@ -1,3 +1,5 @@
+import cv2
+import rospy
 from styx_msgs.msg import TrafficLight
 
 class TLClassifier(object):
@@ -23,4 +25,9 @@ class TLClassifier(object):
         """
         #TODO implement light color prediction
         #return TrafficLight.UNKNOWN
+
+        # To gather dataset
+        #current_time = rospy.get_time()
+        #cv2.imwrite("/tmp/images/camera-{}.jpeg".format(current_time), image)
+
         return TrafficLight.GREEN

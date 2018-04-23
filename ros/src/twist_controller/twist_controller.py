@@ -13,7 +13,9 @@ class Controller(object):
     def __init__(self, vehicle_mass, fuel_capacity, brake_deadband, decel_limit,
                  accel_limit, wheel_radius, wheel_base, steer_ratio, max_lat_accel, max_steer_angle):
 
-        self.yaw_controller = YawController(wheel_base, steer_ratio, 0.1, max_lat_accel, max_steer_angle)
+        min_speed = 0.1
+        self.yaw_controller = YawController(wheel_base, steer_ratio,
+                                            min_speed, max_lat_accel, max_steer_angle)
 
         kp = 0.3
         ki = 0.1
@@ -64,11 +66,15 @@ class Controller(object):
             decel = max(vel_error, self.decel_limit)
             brake = min(MAX_BRAKE, (abs(decel) * self.vehicle_mass * self.wheel_radius))  # Torque N*m
 
+        # logging
         if (current_time - self.log_time) > LOGGING_THROTTLE_FACTOR:
             self.log_time = current_time
-            rospy.logwarn("POSE: current_vel={:.2f}, linear_vel={:.2f}, vel_error={:.2f}".format(current_vel,
-                                                                                                 linear_vel,
-                                                                                                 vel_error))
-            rospy.logwarn("POSE: throttle={:.2f}, brake={:.2f}, steering={:.2f}".format(throttle, brake, steering))
+            rospy.logdebug(
+                "INPUT: current_vel={:.2f}, linear_vel={:.2f}, vel_error={:.2f}".format(current_vel,
+                                                                                        linear_vel,
+                                                                                        vel_error))
+            rospy.logdebug(
+                "OUTPUT: throttle={:.2f}, brake={:.2f}, steering={:.2f}".format(throttle, brake,
+                                                                                steering))
 
         return throttle, brake, steering
