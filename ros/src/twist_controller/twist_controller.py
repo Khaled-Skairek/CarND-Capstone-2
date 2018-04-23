@@ -1,29 +1,26 @@
 import rospy
-from pid import PID
+
 from lowpass import LowPassFilter
+from pid import PID
 from yaw_controller import YawController
 
 GAS_DENSITY = 2.858
-ONE_MPH = 0.44704
+LOGGING_THROTTLE_FACTOR = 3  # Only log after this many seconds
 MAX_BRAKE = 400.0
 
 
 class Controller(object):
-    def __init__(self, vehicle_mass, fuel_capacity,
-                 brake_deadband, decel_limit,
-                 accel_limit, wheel_radius,
-                 wheel_base, steer_ratio,
-                 max_lat_accel, max_steer_angle):
+    def __init__(self, vehicle_mass, fuel_capacity, brake_deadband, decel_limit,
+                 accel_limit, wheel_radius, wheel_base, steer_ratio, max_lat_accel, max_steer_angle):
+
+        self.yaw_controller = YawController(wheel_base, steer_ratio, 0.1, max_lat_accel, max_steer_angle)
+
         kp = 0.3
         ki = 0.1
-        kd = 0.1
+        kd = 0.0
         mn = 0.0  # Minimum throttle value
-        mx = 0.5  # Maximum throttle value
-
-        min_speed = 0.1
+        mx = 0.2  # Maximum throttle value
         self.throttle_controller = PID(kp, ki, kd, mn, mx)
-        self.yaw_controller = YawController(wheel_base, steer_ratio,
-                                            min_speed, max_lat_accel, max_steer_angle)
 
         tau = 0.5  # 1/(2pi*tau) = cutoff frequency
         ts = 0.02  # Sample time
@@ -48,8 +45,6 @@ class Controller(object):
         current_vel = self.vel_lpf.filt(current_vel)
 
         steering = self.yaw_controller.get_steering(linear_vel, angular_vel, current_vel)
-        # rospy.loginfo("linear_vel={}, angular_vel={}, current_vel={}".format(linear_vel, angular_vel, current_vel))
-        # rospy.loginfo("steering={}".format(steering))
 
         vel_error = linear_vel - current_vel
         self.last_vel = current_vel
@@ -69,12 +64,11 @@ class Controller(object):
             decel = max(vel_error, self.decel_limit)
             brake = min(MAX_BRAKE, (abs(decel) * self.vehicle_mass * self.wheel_radius))  # Torque N*m
 
-        # if (current_time - self.log_time) > LOGGING_THROTTLE_FACTOR:
-        #     self.log_time = current_time
-        #     rospy.logwarn("POSE: current_vel={:.2f}, linear_vel={:.2f}, vel_error={:.2f}".format(current_vel,
-        #                                                                                          linear_vel,
-        #                                                                                          vel_error))
-        #     rospy.logwarn("POSE: throttle={:.2f}, brake={:.2f}, steering={:.2f}".format(throttle, brake, steering))
+        if (current_time - self.log_time) > LOGGING_THROTTLE_FACTOR:
+            self.log_time = current_time
+            rospy.logwarn("POSE: current_vel={:.2f}, linear_vel={:.2f}, vel_error={:.2f}".format(current_vel,
+                                                                                                 linear_vel,
+                                                                                                 vel_error))
+            rospy.logwarn("POSE: throttle={:.2f}, brake={:.2f}, steering={:.2f}".format(throttle, brake, steering))
 
-        #rospy.loginfo("(control) throttle={}, brake={}, steering={}".format(throttle, brake, steering))
         return throttle, brake, steering

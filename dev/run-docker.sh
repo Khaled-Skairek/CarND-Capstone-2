@@ -10,9 +10,3 @@ docker run -it \
   -p 4567:4567 \
   --name carnd-capstone \
   carnd-capstone:latest /bin/bash
-#docker run --rm -it \
-#  -p 4567:4567 \
-#  -v ${PROJECT_HOME}:/capstone \
-#  -v /tmp/log:/root/.ros/ \
-#  --name carnd-capstone \
-#  carnd-capstone:latest /bin/bash
