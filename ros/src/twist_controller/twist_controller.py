@@ -9,8 +9,7 @@ MAX_BRAKE = 400.0
 
 
 class Controller(object):
-    def __init__(self, dbw_enabled,
-                 vehicle_mass, fuel_capacity,
+    def __init__(self, vehicle_mass, fuel_capacity,
                  brake_deadband, decel_limit,
                  accel_limit, wheel_radius,
                  wheel_base, steer_ratio,
@@ -20,7 +19,12 @@ class Controller(object):
         kd = 0.0
         mn = 0.0  # Minimum throttle value
         mx = 0.2  # Maximum throttle value
+
+        min_speed = 0.0
         self.throttle_controller = PID(kp, ki, kd, mn, mx)
+        self.yaw_controller = YawController(wheel_base, steer_ratio,
+                                            min_speed, max_lat_accel,
+                                            max_steer_angle)
 
         tau = 0.5  # 1/(2pi*tau) = cutoff frequency
         ts = 0.02  # Sample time

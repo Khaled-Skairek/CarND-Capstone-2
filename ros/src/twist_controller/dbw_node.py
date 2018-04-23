@@ -46,6 +46,17 @@ class DBWNode(object):
         max_lat_accel = rospy.get_param('~max_lat_accel', 3.)
         max_steer_angle = rospy.get_param('~max_steer_angle', 8.)
 
+        # Variables
+        self.dbw_enabled = False
+        self.current_vel = 0.0
+        self.current_linear_v = 0.0
+        self.current_angular_v = 0.0
+        self.linear_vel = 0.0
+        self.angular_vel = 0.0
+        self.throttle = 0.0
+        self.brake = 0.0
+        self.steering = 0.0
+
         # publishers
         self.steer_pub = rospy.Publisher('/vehicle/steering_cmd', SteeringCmd, queue_size=1)
         self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd', ThrottleCmd, queue_size=1)
@@ -68,31 +79,18 @@ class DBWNode(object):
         rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cb)
         rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_cb)
 
-        self.current_linear_v = 0
-        self.current_angular_v = 0
-        self.goal_linear_v = 0
-        self.goal_angular_v = 0
-        self.dbw_enabled = False
-
         self.loop()
 
     def velocity_cb(self, msg):
-        self.current_linear_v = msg.twist.linear.x
-        self.current_angular_v = msg.twist.angular.z
-        log_msg = "current_linear_v = {}, current_angular_v = {}".format(self.current_linear_v,
-                                                                         self.current_angular_v)
-        rospy.logdebug(log_msg)
+        self.current_vel = msg.twist.linear.x
 
     def twist_cb(self, msg):
-        self.goal_linear_v = msg.twist.linear.x
-        self.goal_angular_v = msg.twist.angular.z
-        log_msg = "goal_linear_v = {}, goal_angular_v = {}".format(self.current_linear_v,
-                                                                   self.current_angular_v)
-        rospy.logdebug(log_msg)
+        self.linear_vel = msg.twist.linear.x
+        self.angular_vel = msg.twist.angular.z
 
     def dbw_cb(self, msg):
         self.dbw_enabled = msg.data
-        rospy.logdebug("dbq_enable = {}".format(self.dbw_enabled))
+        rospy.loginfo("dbq_enable = {}".format(self.dbw_enabled))
 
     def loop(self):
         rate = rospy.Rate(50) # 50Hz
@@ -103,6 +101,7 @@ class DBWNode(object):
                                                                                    self.dbw_enabled,
                                                                                    self.linear_vel,
                                                                                    self.angular_vel)
+            #self.publish(self.throttle, self.brake, self.steering)
             if self.dbw_enabled:
                 self.publish(self.throttle, self.brake, self.steering)
                 rospy.loginfo("throttle:{}, brake:{}, steering:{}".format(self.throttle,
