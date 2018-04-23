@@ -36,4 +36,3 @@ VOLUME ["/root/.ros/log/"]
 WORKDIR /capstone/ros
 
 EXPOSE 4567
-COPY .screenrc /root/.screenrc
