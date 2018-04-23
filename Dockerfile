@@ -29,8 +29,8 @@ RUN apt-get install -y ros-$ROS_DISTRO-image-proc
 RUN apt-get install -y netbase
 RUN apt-get install -y less screen
 
-#RUN mkdir /capstone
-#VOLUME ["/capstone"]
+RUN mkdir /capstone
+VOLUME ["/capstone"]
 VOLUME ["/root/.ros/log/"]
 WORKDIR /capstone/ros
 

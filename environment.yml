@@ -4,6 +4,7 @@ channels:
     - conda-forge
 dependencies:
     - python=2.7.12
+    - opencv
     - pip:
         - pip
         - rosinstall==0.7.8
