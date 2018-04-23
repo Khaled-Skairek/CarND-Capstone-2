@@ -16,15 +16,14 @@ class Controller(object):
                  max_lat_accel, max_steer_angle):
         kp = 0.3
         ki = 0.1
-        kd = 0.0
+        kd = 0.1
         mn = 0.0  # Minimum throttle value
-        mx = 0.2  # Maximum throttle value
+        mx = 0.5  # Maximum throttle value
 
-        min_speed = 0.0
+        min_speed = 0.1
         self.throttle_controller = PID(kp, ki, kd, mn, mx)
         self.yaw_controller = YawController(wheel_base, steer_ratio,
-                                            min_speed, max_lat_accel,
-                                            max_steer_angle)
+                                            min_speed, max_lat_accel, max_steer_angle)
 
         tau = 0.5  # 1/(2pi*tau) = cutoff frequency
         ts = 0.02  # Sample time
@@ -49,6 +48,8 @@ class Controller(object):
         current_vel = self.vel_lpf.filt(current_vel)
 
         steering = self.yaw_controller.get_steering(linear_vel, angular_vel, current_vel)
+        # rospy.loginfo("linear_vel={}, angular_vel={}, current_vel={}".format(linear_vel, angular_vel, current_vel))
+        # rospy.loginfo("steering={}".format(steering))
 
         vel_error = linear_vel - current_vel
         self.last_vel = current_vel
@@ -75,4 +76,5 @@ class Controller(object):
         #                                                                                          vel_error))
         #     rospy.logwarn("POSE: throttle={:.2f}, brake={:.2f}, steering={:.2f}".format(throttle, brake, steering))
 
+        #rospy.loginfo("(control) throttle={}, brake={}, steering={}".format(throttle, brake, steering))
         return throttle, brake, steering
