@@ -28,7 +28,7 @@ RUN apt-get install -y ros-$ROS_DISTRO-image-proc
 
 # socket io
 RUN apt-get install -y netbase
-RUN apt-get install -y less screen
+RUN apt-get install -y less
 
 #RUN mkdir /capstone
 #VOLUME ["/capstone"]
