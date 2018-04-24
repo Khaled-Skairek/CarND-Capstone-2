@@ -1,0 +1,6 @@
+[submodule "traffic_light_classifier/models"]
+	path = traffic_light_classifier/models
+	url = git@github.com:tensorflow/models.git
+[submodule "traffic_light_classifier/cocoapi"]
+	path = traffic_light_classifier/cocoapi
+	url = git@github.com:cocodataset/cocoapi.git
