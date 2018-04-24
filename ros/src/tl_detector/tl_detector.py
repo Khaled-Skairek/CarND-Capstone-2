@@ -1,16 +1,19 @@
 #!/usr/bin/env python
+
+import yaml
+import numpy as np
+from scipy.spatial import KDTree, distance
+
 import rospy
-from scipy.spatial import KDTree
-from std_msgs.msg import Int32
 from geometry_msgs.msg import PoseStamped, Pose
+from std_msgs.msg import Int32
 from styx_msgs.msg import TrafficLightArray, TrafficLight
 from styx_msgs.msg import Lane
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+
 from light_classification.tl_classifier import TLClassifier
-import tf
-import cv2
-import yaml
+import tf as rostf
 
 STATE_COUNT_THRESHOLD = 3
 
@@ -26,6 +29,7 @@ class TLDetector(object):
 
         self.waypoints_2d = None
         self.waypoint_tree = None
+        self.lights_tree = None
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -47,7 +51,7 @@ class TLDetector(object):
 
         self.bridge = CvBridge()
         self.light_classifier = TLClassifier()
-        self.listener = tf.TransformListener()
+        self.listener = rostf.TransformListener()
 
         self.state = TrafficLight.UNKNOWN
         self.last_state = TrafficLight.UNKNOWN
@@ -66,9 +70,12 @@ class TLDetector(object):
                                  for waypoint in waypoints.waypoints]
             self.waypoint_tree = KDTree(self.waypoints_2d)
 
-
     def traffic_cb(self, msg):
         self.lights = msg.lights
+        if not self.lights_tree:
+            lights_2d = [[light.pose.pose.position.x, light.pose.pose.position.y]
+                         for light in msg.lights]
+            self.lights_tree = KDTree(lights_2d)
 
     def image_cb(self, msg):
         """Identifies red lights in the incoming camera image and publishes the index
@@ -146,30 +153,61 @@ class TLDetector(object):
         line_wp_idx = None
 
         # List of positions that correspond to the line to stop in front of for a given intersection
-        stop_line_positions = self.config['stop_line_positions']
-        if self.pose:
-            x = self.pose.pose.position.x
-            y = self.pose.pose.position.y
-            car_wp_idx = self.get_closest_waypoint(x, y)
-
-            diff = len(self.waypoints.waypoints)
-            for i, light in enumerate(self.lights):
-                # Get stop line waypoint index
-                line = stop_line_positions[i]
-                temp_wp_idx = self.get_closest_waypoint(line[0], line[1])
-                # Find the closest stop line waypoint index
-                d = temp_wp_idx - car_wp_idx
-                if d >= 0 and d < diff:
-                    diff = d
-                    closest_light = light
-                    line_wp_idx = temp_wp_idx
+        # stop_line_positions = self.config['stop_line_positions']
+        # if self.pose:
+        #     x = self.pose.pose.position.x
+        #     y = self.pose.pose.position.y
+        #     car_wp_idx = self.get_closest_waypoint(x, y)
+        #
+        #     diff = len(self.waypoints.waypoints)
+        #     for i, light in enumerate(self.lights):
+        #         # Get stop line waypoint index
+        #         line = stop_line_positions[i]
+        #         temp_wp_idx = self.get_closest_waypoint(line[0], line[1])
+        #         # Find the closest stop line waypoint index
+        #         d = temp_wp_idx - car_wp_idx
+        #         if 0 <= d < diff:
+        #             diff = d
+        #             closest_light = light
+        #             line_wp_idx = temp_wp_idx
+        closest_light = self.get_closest_light()
 
         if closest_light:
-            state = self.get_light_state(light)
+            state = self.get_light_state(closest_light)
             rospy.loginfo("Closest light state: {}".format(state))
             return line_wp_idx, state
 
         return -1, TrafficLight.UNKNOWN
+
+    def get_closest_light(self):
+        """Get the closest traffic light in front of the car.
+
+        :return: The closest traffic light in front of the car
+        """
+        if self.pose:
+            x = self.pose.pose.position.x
+            y = self.pose.pose.position.y
+
+            # Check if closest is ahead or behind vehicle
+            closest_idx = self.lights_tree.query([x, y], 1)[1]
+            closest_light = self.lights[closest_idx]
+            prev_light = self.lights[closest_idx - 1]
+
+            # Equation for hyperplane through closest_coords
+            closest_vec = np.array([closest_light.pose.pose.position.x,
+                                    closest_light.pose.pose.position.y])
+            prev_vec = np.array([prev_light.pose.pose.position.x,
+                                 prev_light.pose.pose.position.y])
+            pos_vect = np.array([x, y])
+            dot_product = np.dot(closest_vec - prev_vec, pos_vect - closest_vec)
+            if dot_product > 0:
+                closest_idx = (closest_idx + 1) % len(self.lights)
+
+            closest_light = self.lights[closest_idx]
+            # rospy.loginfo("pose.x={},pose.y={}".format(x, y))
+            # rospy.loginfo("light.x={},light.y={}".format(closest_light.pose.pose.position.x,
+            #                                              closest_light.pose.pose.position.y))
+            return closest_light
 
 
 if __name__ == '__main__':
