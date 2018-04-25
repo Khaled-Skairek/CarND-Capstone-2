@@ -37,15 +37,17 @@ class WaypointUpdater(object):
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         self.base_wp_sub = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
+
         # rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
         self.base_waypoints_viz_pub = rospy.Publisher('base_waypoints_viz', Path, queue_size=2)
         self.final_waypoints_viz_pub = rospy.Publisher('final_waypoints_viz', Path, queue_size=2)
+
         # State variables
         self.base_waypoints = [] 
         self.base_vels = []
         self.next_waypoint = None
-        self.current_pose = None
+        self.pose = None
         self.red_light_waypoint = None 
         self.msg_seq = 0
 
@@ -61,12 +63,12 @@ class WaypointUpdater(object):
         if not self.base_waypoints:
             return False
 
-        if not self.current_pose:
+        if not self.pose:
             return False
 
-        ego_x = self.current_pose.position.x
-        ego_y = self.current_pose.position.y
-        ego_theta = math.atan2(self.current_pose.orientation.y, self.current_pose.orientation.x)
+        ego_x = self.pose.position.x
+        ego_y = self.pose.position.y
+        ego_theta = math.atan2(self.pose.orientation.y, self.pose.orientation.x)
 
         t = time.time()
         wp = None
@@ -147,57 +149,18 @@ class WaypointUpdater(object):
                 
             self.publish(final_waypoints)
 
-
     def publish(self, waypoints):
-            lane = Lane()
-            path = Path()
-            path.header.frame_id = '/world'
-            lane.header.frame_id = '/world'
-            lane.header.stamp = rospy.Time.now()
-            path.header.stamp = rospy.Time.now()
-            lane.waypoints = waypoints
-            path.poses = [x.pose for x in waypoints]
-            self.final_waypoints_pub.publish(lane)
-            self.final_waypoints_viz_pub.publish(path)
-            self.msg_seq += 1
-
-    def pose_cb(self, msg):
-        self.current_pose = msg.pose
-
-    def waypoints_cb(self, msg):
-
-        t = time.time()
-        waypoints = msg.waypoints
-        num_wp = len(waypoints)
-
-        self.base_vels = [self.get_waypoint_velocity(waypoints, idx) for idx in range(num_wp)]
-        self.base_waypoints = waypoints
-
-        # Visualizer for base waypoints in Autoware, rviz must be launch first before this node
+        lane = Lane()
         path = Path()
         path.header.frame_id = '/world'
-        path.header.stamp = rospy.Time(0)
+        lane.header.frame_id = '/world'
+        lane.header.stamp = rospy.Time.now()
+        path.header.stamp = rospy.Time.now()
+        lane.waypoints = waypoints
         path.poses = [x.pose for x in waypoints]
-        self.base_waypoints_viz_pub.publish(path)
-
-        self.base_wp_sub.unregister()
-
-    def traffic_cb(self, msg):
-        """
-        Receive and store the waypoint index for the next red traffic light.
-        If the index is <0, then there is no red traffic light ahead
-        """
-        prev_red_light_waypoint = self.red_light_waypoint
-        self.red_light_waypoint = msg.data if msg.data >= 0 else None
-        if prev_red_light_waypoint != self.red_light_waypoint:
-            if debugging:
-                rospy.loginfo("TrafficLight changed: %s", str(self.red_light_waypoint))
-            self.update_and_publish() # Refreshing on light change
-
-    def obstacle_cb(self, msg):
-        # TODO: ?
-        pass
-
+        self.final_waypoints_pub.publish(lane)
+        self.final_waypoints_viz_pub.publish(path)
+        self.msg_seq += 1
 
     def decelerate(self, waypoints, stop_index, stop_distance):
         """
@@ -226,7 +189,6 @@ class WaypointUpdater(object):
     def get_waypoint_velocity(self, waypoints, waypoint):
         return waypoints[waypoint].twist.twist.linear.x
 
-
     def distance(self, waypoints, wp1, wp2):
         dist = 0
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
@@ -234,6 +196,44 @@ class WaypointUpdater(object):
             dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
             wp1 = i
         return dist
+
+    # Callback functions
+    def pose_cb(self, msg):
+        self.pose = msg.pose
+
+    def waypoints_cb(self, msg):
+        t = time.time()
+        waypoints = msg.waypoints
+        num_wp = len(waypoints)
+
+        self.base_vels = [self.get_waypoint_velocity(waypoints, idx) for idx in range(num_wp)]
+        self.base_waypoints = waypoints
+
+        # Visualizer for base waypoints in Autoware, rviz must be launch first before this node
+        path = Path()
+        path.header.frame_id = '/world'
+        path.header.stamp = rospy.Time(0)
+        path.poses = [x.pose for x in waypoints]
+        self.base_waypoints_viz_pub.publish(path)
+
+        self.base_wp_sub.unregister()
+
+    def obstacle_cb(self, msg):
+        # TODO: Callback for /obstacle_waypoint message. We will implement it later
+        pass
+
+    def traffic_cb(self, msg):
+        """
+        Receive and store the waypoint index for the next red traffic light.
+        If the index is <0, then there is no red traffic light ahead
+        """
+        prev_red_light_waypoint = self.red_light_waypoint
+        self.red_light_waypoint = msg.data if msg.data >= 0 else None
+        if prev_red_light_waypoint != self.red_light_waypoint:
+            if debugging:
+                rospy.loginfo("TrafficLight changed: %s", str(self.red_light_waypoint))
+            self.update_and_publish() # Refreshing on light change
+
 
 if __name__ == '__main__':
     try:
