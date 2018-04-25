@@ -1,6 +1,9 @@
 <?xml version="1.0"?>
 <launch>
     <node pkg="waypoint_updater" type="waypoint_updater.py" name="waypoint_updater">
-        <param name="velocity" value="40" />
+  
+      <!-- Distance before red light where car will stop -->
+      <param name="stop_distance" value="8.0" />
+      
     </node>
 </launch>

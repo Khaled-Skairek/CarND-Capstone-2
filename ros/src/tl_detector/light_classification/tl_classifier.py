@@ -39,7 +39,7 @@ class TLClassifier(object):
             self.num_detections = self.detection_graph.get_tensor_by_name('num_detections:0')
 
         # Get session
-        config = tf.ConfigProto(log_device_placement=True)
+        config = tf.ConfigProto(log_device_placement=False)
         config.gpu_options.allow_growth = True
         config.gpu_options.per_process_gpu_memory_fraction = 0.5
         self.sess = tf.Session(graph=self.detection_graph, config=config)
