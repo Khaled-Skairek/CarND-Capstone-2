@@ -99,19 +99,21 @@ class DBWNode(object):
                 duration_in_seconds = ros_duration.secs + (1e-9 * ros_duration.nsecs)
                 self.previous_loop_time = current_time
 
-                current_linear_velocity = self.current_vel.twist.linear.x
-                target_linear_velocity = self.target_vel.twist.linear.x
+                current_linear_vel = self.current_vel.twist.linear.x
+                target_linear_vel = self.target_vel.twist.linear.x
 
-                target_angular_velocity = self.target_vel.twist.angular.z
+                target_angular_vel = self.target_vel.twist.angular.z
                 cross_track_error = self.get_cross_track_error(self.final_waypoints, self.current_pose)
 
-                throttle, brake, steering = self.controller.control(target_linear_velocity,
-                                                                    target_angular_velocity,
-                                                                    current_linear_velocity,
+                throttle, brake, steering = self.controller.control(target_linear_vel,
+                                                                    target_angular_vel,
+                                                                    current_linear_vel,
                                                                     cross_track_error,
                                                                     duration_in_seconds)
-
-                if not self.dbw_enabled or abs(self.current_vel.twist.linear.x) < 1e-5 and abs(self.target_vel.twist.linear.x) < 1e-5:
+                # reset controller
+                if (not self.dbw_enabled
+                        or abs(self.current_vel.twist.linear.x) < 1e-5
+                        and abs(self.target_vel.twist.linear.x) < 1e-5):
                    self.controller.reset()
 
                 if self.dbw_enabled:
@@ -136,13 +138,9 @@ class DBWNode(object):
         bcmd.pedal_cmd = brake
         self.brake_pub.publish(bcmd)
 
-    def get_xy_from_waypoints(self,waypoints):
-        return list(map(lambda waypoint: [waypoint.pose.pose.position.x, waypoint.pose.pose.position.y], waypoints))
-
     def get_cross_track_error(self,final_waypoints, current_pose):
         origin = final_waypoints[0].pose.pose.position
-
-        waypoints_matrix = self.get_xy_from_waypoints(final_waypoints)
+        waypoints_matrix = self.get_waypoints_2d(final_waypoints)
 
         # Convert the coordinates [x,y] in the world view to the car's coordinate
 
@@ -156,7 +154,6 @@ class DBWNode(object):
                 [np.cos(angle), -np.sin(angle)],
                 [np.sin(angle), np.cos(angle)]
             ])
-
         rotated_matrix = np.dot(shifted_matrix, rotation_matrix)
 
         # Fit a 2 degree polynomial to the waypoints
@@ -171,6 +168,9 @@ class DBWNode(object):
         actual_y_value = rotated_pose[1]
 
         return expected_y_value - actual_y_value
+
+    def get_waypoints_2d(self,waypoints):
+        return [[w.pose.pose.position.x, w.pose.pose.position.y] for w in waypoints]
 
     def twist_cb(self, msg):
         self.target_vel = msg
