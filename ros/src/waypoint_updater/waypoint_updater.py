@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
+import numpy as np
 import rospy
 from geometry_msgs.msg import PoseStamped
+from scipy.spatial import KDTree
 from styx_msgs.msg import Lane, Waypoint
 from nav_msgs.msg import Path
 from std_msgs.msg import Int32
@@ -27,15 +29,16 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 LOOKAHEAD_WPS = 200    # Number of waypoints we will publish
 PUBLISH_RATE = 10      # Publishing rate (Hz) Default: 50
 
-max_wp_distance = 20.0 
-debugging = False               
+max_wp_distance = 20.0
+debugging = False
+
 
 class WaypointUpdater(object):
     def __init__(self):
         rospy.init_node('waypoint_updater')
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
-        self.base_wp_sub = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
+        self.base_wp_sub = rospy.Subscriber('/base_waypoints', Lane, self.base_waypoints_cb)
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
 
         # rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
@@ -44,71 +47,42 @@ class WaypointUpdater(object):
         self.final_waypoints_viz_pub = rospy.Publisher('final_waypoints_viz', Path, queue_size=2)
 
         # State variables
-        self.base_waypoints = [] 
+        self.base_waypoints = []
         self.base_vels = []
         self.next_waypoint = None
         self.pose = None
-        self.red_light_waypoint = None 
+        self.red_light_waypoint = None
         self.msg_seq = 0
+        self.waypoints_2d = None
+        self.waypoint_tree = None
 
         self.accel = max(rospy.get_param('/dbw_node/decel_limit') *0.5, -1.0)
         self.stop_distance = rospy.get_param('~stop_distance', 5.0)  # Distance (m) where car will stop before red light
-        
+
         rate = rospy.Rate(PUBLISH_RATE)
         while not rospy.is_shutdown():
             self.update_and_publish()
             rate.sleep()
 
-    def _update_next_waypoint(self):
-        if not self.base_waypoints:
-            return False
+    def get_closest_waypoint_idx(self, x, y):
+        closest_idx = self.waypoint_tree.query([x, y], 1)[1]
+        return closest_idx
 
-        if not self.pose:
-            return False
+    def get_next_waypoint(self, x, y):
+        closest_idx = self.get_closest_waypoint_idx(x, y)
+        # Check if closest is ahead or behind vehicle
+        closest_coord = self.waypoints_2d[closest_idx]
+        prev_coord = self.waypoints_2d[closest_idx - 1]
 
-        ego_x = self.pose.position.x
-        ego_y = self.pose.position.y
-        ego_theta = math.atan2(self.pose.orientation.y, self.pose.orientation.x)
+        # Equation for hyperplane through closest_coords
+        cl_vect = np.array(closest_coord)
+        prev_vect = np.array(prev_coord)
+        pos_vect = np.array([x, y])
+        val = np.dot(cl_vect - prev_vect, pos_vect - cl_vect)
 
-        t = time.time()
-        wp = None
-        yaw = 0
-        dist = 1000000 # Long number
-        if self.next_waypoint:
-            idx_offset = self.next_waypoint
-            full_search = False
-        else:
-            idx_offset = 0
-            full_search = True
-        num_base_wp = len(self.base_waypoints)
-
-        for i in range(num_base_wp):
-            idx = (i + idx_offset)%(num_base_wp)
-            wp_x = self.base_waypoints[idx].pose.pose.position.x
-            wp_y = self.base_waypoints[idx].pose.pose.position.y
-            wp_d = math.sqrt((ego_x - wp_x)**2 + (ego_y - wp_y)**2)
-
-            if wp_d < dist:
-                dist = wp_d
-                wp = idx
-                if debugging:
-                    # Angle betwee car heading and waypoint heading
-                    yaw = math.atan2(wp_y - ego_y, wp_x - ego_x) - ego_theta
-            elif not full_search:
-                # Local minimum. If the waypoint makes sense, just use it and break
-                if dist < max_wp_distance:
-                    break; # We found a point
-                else:
-                    # We seem to have lost track. We search again
-                    rospy.logwarn("Waypoint updater lost track (local min at %.1f m after %d waypoints). Going back to full search.", dist, i+1)
-                    full_search = True
-
-        if wp is None:
-            rospy.logwarn("Waypoint updater did not find a valid waypoint")
-            return False
-
-        self.next_waypoint = wp
-        return True
+        if val > 0:
+            closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
+        return closest_idx
 
     def update_and_publish(self):
         """
@@ -117,13 +91,17 @@ class WaypointUpdater(object):
         - Update velocity for them
         - Publish them to "/final_waypoints"
         """
-        # 1. Find next_waypoint based on ego position & orientation
-        if self._update_next_waypoint():
+        if self.pose:
+            x = self.pose.pose.position.x
+            y = self.pose.pose.position.y
+            # Find next_waypoint based on ego position & orientation
+            next_waypoint = self.get_next_waypoint(x, y)
 
             # 2. Generate the list of next LOOKAHEAD_WPS waypoints
             num_base_wp = len(self.base_waypoints)
-            last_base_wp = num_base_wp-1
-            waypoint_idx = [idx % num_base_wp for idx in range(self.next_waypoint,self.next_waypoint+LOOKAHEAD_WPS)]
+            last_base_wp = num_base_wp - 1
+            waypoint_idx = [idx % num_base_wp
+                            for idx in range(next_waypoint, next_waypoint + LOOKAHEAD_WPS)]
             final_waypoints = [self.base_waypoints[wp] for wp in waypoint_idx]
 
             # Start from original velocities
@@ -146,20 +124,15 @@ class WaypointUpdater(object):
             total_vel = 0
             for fwp in final_waypoints:
                 total_vel+=fwp.twist.twist.linear.x
-                
+
             self.publish(final_waypoints)
 
     def publish(self, waypoints):
         lane = Lane()
-        path = Path()
-        path.header.frame_id = '/world'
         lane.header.frame_id = '/world'
         lane.header.stamp = rospy.Time.now()
-        path.header.stamp = rospy.Time.now()
         lane.waypoints = waypoints
-        path.poses = [x.pose for x in waypoints]
         self.final_waypoints_pub.publish(lane)
-        self.final_waypoints_viz_pub.publish(path)
         self.msg_seq += 1
 
     def decelerate(self, waypoints, stop_index, stop_distance):
@@ -170,7 +143,7 @@ class WaypointUpdater(object):
             return
         dist = self.distance(waypoints, 0, stop_index)
         step = dist / stop_index
-        
+
         v = 0.
         d = 0.
         for idx in reversed(range(len(waypoints))):
@@ -183,39 +156,33 @@ class WaypointUpdater(object):
             if v < self.get_waypoint_velocity(waypoints, idx):
                 self.set_waypoint_velocity(waypoints, idx, v)
 
-    def set_waypoint_velocity(self, waypoints, waypoint, velocity):
-        waypoints[waypoint].twist.twist.linear.x = velocity
-
     def get_waypoint_velocity(self, waypoints, waypoint):
         return waypoints[waypoint].twist.twist.linear.x
 
+    def set_waypoint_velocity(self, waypoints, waypoint, velocity):
+        waypoints[waypoint].twist.twist.linear.x = velocity
+
     def distance(self, waypoints, wp1, wp2):
         dist = 0
-        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
-        for i in range(wp1, wp2+1):
+        dl = lambda a, b: math.sqrt(pow((a.x - b.x), 2) + pow((a.y - b.y), 2) + pow((a.z - b.z), 2))
+        for i in range(wp1, wp2 + 1):
             dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
             wp1 = i
         return dist
 
     # Callback functions
     def pose_cb(self, msg):
-        self.pose = msg.pose
+        self.pose = msg
 
-    def waypoints_cb(self, msg):
+    def base_waypoints_cb(self, msg):
         t = time.time()
-        waypoints = msg.waypoints
-        num_wp = len(waypoints)
+        self.base_waypoints = msg.waypoints
+        if not self.waypoints_2d:
+            self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y]
+                                 for waypoint in msg.waypoints]
+            self.waypoint_tree = KDTree(self.waypoints_2d)
 
-        self.base_vels = [self.get_waypoint_velocity(waypoints, idx) for idx in range(num_wp)]
-        self.base_waypoints = waypoints
-
-        # Visualizer for base waypoints in Autoware, rviz must be launch first before this node
-        path = Path()
-        path.header.frame_id = '/world'
-        path.header.stamp = rospy.Time(0)
-        path.poses = [x.pose for x in waypoints]
-        self.base_waypoints_viz_pub.publish(path)
-
+        self.base_vels = [self.get_waypoint_velocity(msg.waypoints, i) for i in range(len(msg.waypoints))]
         self.base_wp_sub.unregister()
 
     def obstacle_cb(self, msg):
@@ -232,7 +199,7 @@ class WaypointUpdater(object):
         if prev_red_light_waypoint != self.red_light_waypoint:
             if debugging:
                 rospy.loginfo("TrafficLight changed: %s", str(self.red_light_waypoint))
-            self.update_and_publish() # Refreshing on light change
+            self.update_and_publish()  # Refreshing on light change
 
 
 if __name__ == '__main__':
