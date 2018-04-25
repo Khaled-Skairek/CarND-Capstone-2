@@ -2,8 +2,10 @@ from pid import PID
 from yaw_controller import YawController
 import math
 import rospy
+
 GAS_DENSITY = 2.858
 ONE_MPH = 0.44704
+MAX_BRAKE = 400
 
 
 class Controller(object):
@@ -31,20 +33,24 @@ class Controller(object):
         self.velocity_pid.reset()
         self.steering_pid.reset()
 
-    def control(self, target_linear_velocity, target_angular_velocity, current_linear_velocity, cross_track_error, sample_time):
-        linear_velocity_error = target_linear_velocity - current_linear_velocity
+    def control(self, target_linear_vel, target_angular_vel, current_linear_vel,
+                cross_track_error, sample_time):
+        vel_error = target_linear_vel - current_linear_vel
 
-        velocity_correction = self.velocity_pid.step(linear_velocity_error, sample_time)
+        velocity_correction = self.velocity_pid.step(vel_error, sample_time)
 
         brake = 0
         throttle = velocity_correction
 
-        if(throttle < 0):
+        if target_linear_vel == 0.0 and current_linear_vel < 0.1:
+            throttle = 0.0
+            brake = MAX_BRAKE  # N*m - to hold the car in place if we are stopped at a light. Acceleration ~ 1m/s^2
+        elif throttle < 0:
             deceleration = abs(throttle)
             brake = (self.vehicle_mass + self.fuel_capacity * GAS_DENSITY) * self.wheel_radius * deceleration if deceleration > self.brake_deadband else 0.
             throttle = 0
 
-        predictive_steering = self.yaw_controller.get_steering(target_linear_velocity, target_angular_velocity, current_linear_velocity)
+        predictive_steering = self.yaw_controller.get_steering(target_linear_vel, target_angular_vel, current_linear_vel)
         # without Steering PID car will wiggle around the waypoint path
         corrective_steering = self.steering_pid.step(cross_track_error, sample_time)
         steering = predictive_steering + corrective_steering
