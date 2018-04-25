@@ -71,48 +71,50 @@ class DBWNode(object):
         # Create `TwistController` object
         self.controller = Controller(**config)
 
-        self.is_dbw_enabled = False
-        self.current_velocity = None
-        self.proposed_velocity = None
+        self.dbw_enabled = False
+        self.current_vel = None
+        self.target_vel = None
         self.final_waypoints = None
         self.current_pose = None
         self.previous_loop_time = rospy.get_rostime()
 
 
         # Subscribe to all the topics you need to
-        self.twist_sub = rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_message_callback, queue_size=1)
-        self.velocity_sub = rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_callback, queue_size=1)
-        self.dbw_sub = rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_callback, queue_size=1)
+        self.twist_sub = rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cb, queue_size=1)
+        self.velocity_sub = rospy.Subscriber('/current_velocity', TwistStamped, self.current_vel_cb, queue_size=1)
+        self.dbw_sub = rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb, queue_size=1)
         self.final_wp_sub = rospy.Subscriber('final_waypoints', Lane, self.final_waypoints_cb, queue_size=1)
         self.pose_sub = rospy.Subscriber('/current_pose', PoseStamped, self.current_pose_cb, queue_size=1)
 
         self.loop()
 
     def loop(self):
-        rate = rospy.Rate(50) # 50Hz
+        rate = rospy.Rate(50)  # 50Hz
         while not rospy.is_shutdown():
             # Get predicted throttle, brake, and steering using `twist_controller`
             # You should only publish the control commands if dbw is enabled
-            if (self.current_velocity is not None) and (self.proposed_velocity is not None) and (self.final_waypoints is not None):
+            if (self.current_vel is not None) and (self.target_vel is not None) and (self.final_waypoints is not None):
                 current_time = rospy.get_rostime()
                 ros_duration = current_time - self.previous_loop_time
                 duration_in_seconds = ros_duration.secs + (1e-9 * ros_duration.nsecs)
                 self.previous_loop_time = current_time
 
-                current_linear_velocity = self.current_velocity.twist.linear.x
-                target_linear_velocity = self.proposed_velocity.twist.linear.x
+                current_linear_velocity = self.current_vel.twist.linear.x
+                target_linear_velocity = self.target_vel.twist.linear.x
 
-                target_angular_velocity = self.proposed_velocity.twist.angular.z
+                target_angular_velocity = self.target_vel.twist.angular.z
                 cross_track_error = self.get_cross_track_error(self.final_waypoints, self.current_pose)
 
                 throttle, brake, steering = self.controller.control(target_linear_velocity,
                                                                     target_angular_velocity,
-                                                                    current_linear_velocity, cross_track_error, duration_in_seconds)
+                                                                    current_linear_velocity,
+                                                                    cross_track_error,
+                                                                    duration_in_seconds)
 
-                if not self.is_dbw_enabled or abs(self.current_velocity.twist.linear.x) < 1e-5 and abs(self.proposed_velocity.twist.linear.x) < 1e-5:
+                if not self.dbw_enabled or abs(self.current_vel.twist.linear.x) < 1e-5 and abs(self.target_vel.twist.linear.x) < 1e-5:
                    self.controller.reset()
 
-                if self.is_dbw_enabled:
+                if self.dbw_enabled:
                     self.publish(throttle, brake, steering)
             rate.sleep()
 
@@ -134,12 +136,8 @@ class DBWNode(object):
         bcmd.pedal_cmd = brake
         self.brake_pub.publish(bcmd)
 
-    def twist_message_callback(self, message):
-        self.proposed_velocity = message
-
     def get_xy_from_waypoints(self,waypoints):
         return list(map(lambda waypoint: [waypoint.pose.pose.position.x, waypoint.pose.pose.position.y], waypoints))
-
 
     def get_cross_track_error(self,final_waypoints, current_pose):
         origin = final_waypoints[0].pose.pose.position
@@ -174,21 +172,22 @@ class DBWNode(object):
 
         return expected_y_value - actual_y_value
 
+    def twist_cb(self, msg):
+        self.target_vel = msg
 
+    def current_vel_cb(self, msg):
+        self.current_vel = msg
 
-    def current_velocity_callback(self, message):
-        self.current_velocity = message
+    def dbw_enabled_cb(self, msg):
+        rospy.logwarn("DBW_ENABLED %s" % msg)
+        self.dbw_enabled = msg.data
 
+    def final_waypoints_cb(self, msg):
+        self.final_waypoints = msg.waypoints
 
-    def dbw_enabled_callback(self, message):
-        rospy.logwarn("DBW_ENABLED %s" % message)
-        self.is_dbw_enabled = message.data
+    def current_pose_cb(self, msg):
+        self.current_pose = msg
 
-    def final_waypoints_cb(self, message):
-        self.final_waypoints = message.waypoints
-
-    def current_pose_cb(self, message):
-        self.current_pose = message
 
 if __name__ == '__main__':
     DBWNode()
