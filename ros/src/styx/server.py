@@ -12,7 +12,7 @@ from bridge import Bridge
 from conf import conf
 
 monkey_var = os.getenv('EVENTLET_MONKEY_PATCH', 'FALSE')
-apply_monkey_patch = (monkey_var in ['true','TRUE','yes','YES','on','ON'])
+apply_monkey_patch = (monkey_var.upper() == 'TRUE')
 sio = None
 if apply_monkey_patch:
     # Solution from "Car freezes in simulator" problem
