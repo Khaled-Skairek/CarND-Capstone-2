@@ -25,7 +25,7 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 
 # Implentation parameters
 LOOKAHEAD_WPS = 200    # Number of waypoints we will publish
-PUBLISH_RATE = 20      # Publishing rate (Hz)
+PUBLISH_RATE = 10      # Publishing rate (Hz) Default: 50
 
 max_wp_distance = 20.0 
 debugging = False               
