@@ -38,12 +38,13 @@ class Controller(object):
         vel_error = target_linear_vel - current_linear_vel
         throttle = self.velocity_pid.step(vel_error, sample_time)
 
+        # N*m - to hold the car in place if we are stopped at a light. Acceleration ~ 1m/s^2
         brake = 0.0
         # Stop
         if target_linear_vel == 0.0 and current_linear_vel < 0.1:
             throttle = 0.0
-            brake = MAX_BRAKE  # N*m - to hold the car in place if we are stopped at a light. Acceleration ~ 1m/s^2
-        # Decele
+            brake = MAX_BRAKE
+        # Decelerate
         elif throttle < 0:
             deceleration = abs(throttle)
             if deceleration > self.brake_deadband:

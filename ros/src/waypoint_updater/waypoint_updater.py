@@ -44,7 +44,7 @@ class WaypointUpdater(object):
         # rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
         self.base_waypoints_viz_pub = rospy.Publisher('base_waypoints_viz', Path, queue_size=2)
-        self.final_waypoints_viz_pub = rospy.Publisher('final_waypoints_viz', Path, queue_size=2)
+        self.next_waypoint_pub = rospy.Publisher('/next_waypoint', Int32, queue_size=1)
 
         # State variables
         self.base_waypoints = []
@@ -82,6 +82,7 @@ class WaypointUpdater(object):
 
         if val > 0:
             closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
+        self.next_waypoint_pub.publish(closest_idx)
         return closest_idx
 
     def update_and_publish(self):
