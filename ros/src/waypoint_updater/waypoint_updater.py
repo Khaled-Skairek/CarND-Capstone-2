@@ -176,7 +176,6 @@ class WaypointUpdater(object):
         self.pose = msg
 
     def base_waypoints_cb(self, msg):
-        t = time.time()
         self.base_waypoints = msg.waypoints
         if not self.waypoints_2d:
             self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y]
