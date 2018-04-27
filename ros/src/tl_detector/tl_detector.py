@@ -202,47 +202,6 @@ class TLDetector(object):
         
         return closest
 
-    def get_closest_light(self):
-        """Identifies the closest light in front of the current car location
-        
-        Returns:
-            closest_light: index of closest light in front of the car
-        """
-        closest_light = None
-
-        if self.base_waypoints and self.pose and len(self.lights) > 0 and self.next_waypoint:
-            car_posXY = [self.pose.pose.position.x, self.pose.pose.position.y]
-            # wp_i1 = self.get_closest_waypoint(car_posXY)  # index of closest waypoint in front of car
-            wp_i1 = self.next_waypoint
-            # pick one further out, to get more stable dot product calculation
-            if wp_i1 == len(self.base_waypoints_2d) - 1:
-                wp_posXY = self.base_waypoints_2d[0]
-            else:
-                wp_posXY = self.base_waypoints_2d[wp_i1 + 1]
-
-            car_posXY = np.array([car_posXY])  # 2D array, valid for cdist
-            dist = distance.cdist(self.lights_posXY, car_posXY)
-            closest_light = np.argmin(dist)
-            car_posXY = car_posXY.flatten()  # get rid of 2nd dimension
-            
-        
-            # check if closest one is behind the car. If it is, then we need to pick the next light.
-            tl_posXY = self.lights_posXY[closest_light]
-            v1 = wp_posXY - car_posXY
-            v2 = tl_posXY - car_posXY
-            dot_product = np.dot(v1,v2)
-            
-            if dot_product > 0: 
-                pass # found closest light in front of car
-            else:
-                # light is behind car, pick next one
-                if closest_light == len(self.lights)-1:
-                    closest_light = 0
-                else:
-                    closest_light += 1
-            
-        return closest_light  # return the index of the closest light in front of the car
-
     def get_light_state_async(self):
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
 
