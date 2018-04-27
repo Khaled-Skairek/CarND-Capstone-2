@@ -11,7 +11,7 @@ import tf
 import cv2
 import yaml
 import numpy as np
-from scipy.spatial import distance
+from scipy.spatial import distance, KDTree
 import threading
 
 DEBUG = True              # get printout
@@ -42,6 +42,9 @@ class TLDetector(object):
         self.async_light_state = TrafficLight.UNKNOWN
 
         self.next_waypoint = None
+
+        self.lights_2d = None
+        self.lights_tree = None
 
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
@@ -93,6 +96,10 @@ class TLDetector(object):
         
         # store lights from styx_msgs as well        
         self.lights = msg.lights
+        if not self.lights_2d:
+            self.lights_2d = [[light.pose.pose.position.x, light.pose.pose.position.y]
+                              for light in msg.lights]
+            self.lights_tree = KDTree(self.lights_2d)
 
     def image_cb(self, msg):
         """Identifies red lights in the incoming camera image and publishes the index
@@ -130,6 +137,26 @@ class TLDetector(object):
         # only increase count if we are looking at a light
         if light_wp != NO_LIGHT:
             self.state_count += 1
+
+    def get_closest_light_idx(self, x, y):
+        closest_idx = self.lights_tree.query([x, y], 1)[1]
+        return closest_idx
+
+    def get_next_light_idx(self, x, y):
+        closest_idx = self.get_closest_light_idx(x, y)
+        # Check if closest is ahead or behind vehicle
+        closest_coord = self.lights_2d[closest_idx]
+        prev_coord = self.lights_2d[closest_idx - 1]
+
+        # Equation for hyperplane through closest_coords
+        cl_vect = np.array(closest_coord)
+        prev_vect = np.array(prev_coord)
+        pos_vect = np.array([x, y])
+        val = np.dot(cl_vect - prev_vect, pos_vect - cl_vect)
+
+        if val > 0:
+            closest_idx = (closest_idx + 1) % len(self.lights_2d)
+        return closest_idx
 
     def get_closest_waypoint(self, position):
         """Identifies the closest path waypoint in front of the car to the given position
@@ -254,7 +281,10 @@ class TLDetector(object):
 
             #TODO find the closest visible traffic light (if one exists)
             #if car_position:
-            closest_light = self.get_closest_light()
+            # closest_light = self.get_closest_light()
+            car_x = self.pose.pose.position.x
+            car_y = self.pose.pose.position.y
+            closest_light = self.get_next_light_idx(car_x, car_y)
             if closest_light is not None:
                 light = self.lights[closest_light]
                 # get waypoint of stopping line in front of light
