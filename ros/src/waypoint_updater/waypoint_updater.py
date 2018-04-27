@@ -64,7 +64,11 @@ class WaypointUpdater(object):
     def loop(self):
         rate = rospy.Rate(PUBLISH_RATE)
         while not rospy.is_shutdown():
-            self.update_and_publish()
+            final_waypoints = self.get_final_waypoints()
+            if final_waypoints:
+                lane = self.generate_lane(final_waypoints)
+                self.final_waypoints_pub.publish(lane)
+                self.msg_seq += 1
             rate.sleep()
 
     def get_closest_waypoint_idx(self, x, y):
@@ -87,13 +91,8 @@ class WaypointUpdater(object):
             closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
         return closest_idx
 
-    def update_and_publish(self):
-        """
-        - Update next_waypoint based on current_pose and base_waypoints
-        - Generate the list of the next LOOKAHEAD_WPS waypoints
-        - Update velocity for them
-        - Publish them to "/final_waypoints"
-        """
+    def get_final_waypoints(self):
+        """Get final waypoints"""
         if self.pose:
             x = self.pose.pose.position.x
             y = self.pose.pose.position.y
@@ -128,15 +127,14 @@ class WaypointUpdater(object):
             for fwp in final_waypoints:
                 total_vel+=fwp.twist.twist.linear.x
 
-            self.publish(final_waypoints)
+            return final_waypoints
 
-    def publish(self, waypoints):
+    def generate_lane(self, waypoints):
         lane = Lane()
         lane.header.frame_id = '/world'
         lane.header.stamp = rospy.Time.now()
         lane.waypoints = waypoints
-        self.final_waypoints_pub.publish(lane)
-        self.msg_seq += 1
+        return lane
 
     def decelerate(self, waypoints, stop_index, stop_distance):
         """
