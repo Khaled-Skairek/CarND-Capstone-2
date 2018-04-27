@@ -26,8 +26,9 @@ class TLDetector(object):
         rospy.init_node('tl_detector')
 
         self.pose = None
-        self.base_waypoints = None
-        self.base_waypoints_2d = None
+        self.waypoints = None
+        self.waypoints_2d = None
+        self.waypoints_tree = None
         self.camera_image = None
         self.lights = []
         self.bridge = CvBridge()
@@ -73,10 +74,11 @@ class TLDetector(object):
 
     def waypoints_cb(self, msg):
         # store base_waypoints
-        self.base_waypoints = msg
-        if not self.base_waypoints_2d:
-            self.base_waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y]
-                                      for waypoint in msg.waypoints]
+        self.waypoints = msg
+        if not self.waypoints_2d:
+            self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y]
+                                 for waypoint in msg.waypoints]
+            self.waypoints_tree = KDTree(self.waypoints_2d)
 
     def next_waypoint_cb(self, msg):
         self.next_waypoint = msg.data
@@ -138,6 +140,26 @@ class TLDetector(object):
         if light_wp != NO_LIGHT:
             self.state_count += 1
 
+    def get_closest_waypoint_idx(self, x, y):
+        closest_idx = self.waypoints_tree.query([x, y], 1)[1]
+        return closest_idx
+
+    def get_next_waypoint_idx(self, x, y):
+        closest_idx = self.get_closest_waypoint_idx(x, y)
+        # Check if closest is ahead or behind vehicle
+        closest_coord = self.waypoints_2d[closest_idx]
+        prev_coord = self.waypoints_2d[closest_idx - 1]
+
+        # Equation for hyperplane through closest_coords
+        cl_vect = np.array(closest_coord)
+        prev_vect = np.array(prev_coord)
+        pos_vect = np.array([x, y])
+        val = np.dot(cl_vect - prev_vect, pos_vect - cl_vect)
+
+        if val > 0:
+            closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
+        return closest_idx
+
     def get_closest_light_idx(self, x, y):
         closest_idx = self.lights_tree.query([x, y], 1)[1]
         return closest_idx
@@ -178,19 +200,19 @@ class TLDetector(object):
         #     v2: p1->position
         # - If dot product is positive then p2 is next waypoint else p1
         
-        if self.base_waypoints:
+        if self.waypoints:
             pos = np.array([position])  # 2D array, valid for cdist
-            dist = distance.cdist(self.base_waypoints_2d, pos)
+            dist = distance.cdist(self.waypoints_2d, pos)
             i1 = np.argmin(dist)
             
-            if i1 == len(self.base_waypoints_2d)-1:
+            if i1 == len(self.waypoints_2d)-1:
                 i2 = 0
             else:
                 i2 = i1+1      
             pos = pos.flatten() # get rid of 2nd dimension
             
-            p1 = np.array(self.base_waypoints_2d[i1])
-            p2 = np.array(self.base_waypoints_2d[i2])
+            p1 = np.array(self.waypoints_2d[i1])
+            p2 = np.array(self.waypoints_2d[i2])
             v1 = p2 - p1
             v2 = pos - p1
             dot_product = np.dot(v1, v2)
@@ -247,8 +269,13 @@ class TLDetector(object):
             if closest_light is not None:
                 light = self.lights[closest_light]
                 # get waypoint of stopping line in front of light
-                stopline_wp = self.get_closest_waypoint(stop_line_positions[closest_light])
-                
+                stop_line_position = stop_line_positions[closest_light]
+                stop_line_position_x = stop_line_position[0]
+                stop_line_position_y = stop_line_position[1]
+                stopline_wp = self.get_closest_waypoint_idx(stop_line_position_x, stop_line_position_y)
+
+                #stopline_wp = self.get_closest_waypoint(stop_line_positions[closest_light])
+
                 #if DEBUG:
                 #    light_wp = self.get_closest_waypoint([self.lights[closest_light].pose.pose.position.x,
                 #                                                      self.lights[closest_light].pose.pose.position.y])
@@ -266,7 +293,7 @@ class TLDetector(object):
                     state = self.get_light_state(light)
                     return stopline_wp, state
         
-        self.base_waypoints = None
+        self.waypoints = None
         return NO_LIGHT, TrafficLight.UNKNOWN
 
 
