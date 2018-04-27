@@ -56,8 +56,12 @@ class WaypointUpdater(object):
         self.waypoint_tree = None
 
         self.accel = max(rospy.get_param('/dbw_node/decel_limit') *0.5, -1.0)
-        self.stop_distance = rospy.get_param('~stop_distance', 5.0)  # Distance (m) where car will stop before red light
+        # Distance (m) where car will stop before red light
+        self.stop_distance = rospy.get_param('~stop_distance', 5.0)
 
+        self.loop()
+
+    def loop(self):
         rate = rospy.Rate(PUBLISH_RATE)
         while not rospy.is_shutdown():
             self.update_and_publish()
@@ -194,10 +198,10 @@ class WaypointUpdater(object):
         """
         prev_red_light_waypoint = self.red_light_waypoint
         self.red_light_waypoint = msg.data if msg.data >= 0 else None
-        if prev_red_light_waypoint != self.red_light_waypoint:
-            if debugging:
-                rospy.loginfo("TrafficLight changed: %s", str(self.red_light_waypoint))
-            self.update_and_publish()  # Refreshing on light change
+        # if prev_red_light_waypoint != self.red_light_waypoint:
+        #     if debugging:
+        #         rospy.loginfo("TrafficLight changed: %s", str(self.red_light_waypoint))
+        #     self.update_and_publish()  # Refreshing on light change
 
 
 if __name__ == '__main__':
