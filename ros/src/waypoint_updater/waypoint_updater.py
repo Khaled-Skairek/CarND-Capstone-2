@@ -55,7 +55,7 @@ class WaypointUpdater(object):
         self.waypoints_2d = None
         self.waypoint_tree = None
 
-        self.accel = max(rospy.get_param('/dbw_node/decel_limit') *0.5, -1.0)
+        self.accel = max(rospy.get_param('/dbw_node/decel_limit') * 0.5, -1.0)
         # Distance (m) where car will stop before red light
         self.stop_distance = rospy.get_param('~stop_distance', 5.0)
 
@@ -99,7 +99,7 @@ class WaypointUpdater(object):
             # Find next_waypoint based on ego position & orientation
             next_waypoint = self.get_next_waypoint(x, y)
 
-            # 2. Generate the list of next LOOKAHEAD_WPS waypoints
+            # Generate the list of next LOOKAHEAD_WPS waypoints
             num_base_wp = len(self.base_waypoints)
             last_base_wp = num_base_wp - 1
             waypoint_idx = [idx % num_base_wp
@@ -137,9 +137,7 @@ class WaypointUpdater(object):
         return lane
 
     def decelerate(self, waypoints, stop_index, stop_distance):
-        """
-        Decelerate a list of wayponts so that they stop on stop_index
-        """
+        """Decelerate a list of wayponts so that they stop on stop_index"""
         if stop_index <= 0:
             return
         dist = self.distance(waypoints, 0, stop_index)
@@ -190,16 +188,7 @@ class WaypointUpdater(object):
         pass
 
     def traffic_cb(self, msg):
-        """
-        Receive and store the waypoint index for the next red traffic light.
-        If the index is <0, then there is no red traffic light ahead
-        """
-        prev_red_light_waypoint = self.red_light_waypoint
         self.red_light_waypoint = msg.data if msg.data >= 0 else None
-        # if prev_red_light_waypoint != self.red_light_waypoint:
-        #     if debugging:
-        #         rospy.loginfo("TrafficLight changed: %s", str(self.red_light_waypoint))
-        #     self.update_and_publish()  # Refreshing on light change
 
 
 if __name__ == '__main__':

@@ -56,15 +56,17 @@ class TLClassifier(object):
         with self.detection_graph.as_default():
             # expand simention to reshape input image to [1, None, None, 3].
             img_expanded = np.expand_dims(image, axis=0)
-            feed_dict = {self.image_tensor: img_expanded}
+            feed_dict = {
+                self.image_tensor: img_expanded
+            }
             boxes, scores, classes, num_detections = self.sess.run(
                 [self.detection_boxes, self.detection_scores,
                  self.detection_classes, self.num_detections], feed_dict=feed_dict)
 
+            # Visualize inferenced result.:w
             outimage = image
             self.visualize(outimage, np.squeeze(boxes), np.squeeze(classes).astype(np.int32),
                            np.squeeze(scores))
-
             try:
                 self.image_pub.publish(self.bridge.cv2_to_imgmsg(outimage, "rgb8"))
             except CvBridgeError as e:
@@ -95,10 +97,8 @@ class TLClassifier(object):
                 rospy.loginfo('UNKNOWN traffic light')
                 return TrafficLight.UNKNOWN
 
-    def visualize(self, image, boxes, classes, scores):
+    def visualize(self, image, boxes, classes, scores, thickness=2, font_size=0.5):
         height, width, channels = image.shape
-        THICKNESS = 2
-        FONT_SIZE = 0.5
         for i, score in enumerate(scores):
             if score >= 0.5:
                 colorIndex = classes[i] - 1
@@ -106,14 +106,14 @@ class TLClassifier(object):
                 colorStr = TRAFFIC_LIGHT_COLORS[colorIndex]
                 startPos = (int(boxes[i][1] * width), int(boxes[i][0] * height))
                 endPos = (int(boxes[i][3] * width), int(boxes[i][2] * height))
-                cv2.rectangle(image, startPos, endPos, color, THICKNESS)
-                textSize, baseline = cv2.getTextSize(colorStr, cv2.FONT_HERSHEY_SIMPLEX, FONT_SIZE, 1)
+                cv2.rectangle(image, startPos, endPos, color, thickness)
+                textSize, baseline = cv2.getTextSize(colorStr, cv2.FONT_HERSHEY_SIMPLEX, font_size, 1)
 
                 boxStart = (startPos[0], startPos[1] - textSize[1])
                 boxEnd = (startPos[0] + textSize[0], startPos[1])
 
                 cv2.rectangle(image, boxStart, boxEnd, color, -1)
-                cv2.putText(image, colorStr, startPos, cv2.FONT_HERSHEY_SIMPLEX, FONT_SIZE,
+                cv2.putText(image, colorStr, startPos, cv2.FONT_HERSHEY_SIMPLEX, font_size,
                             (0, 0, 0))
             else:
                 # no need to check any more since the scores are sorted
