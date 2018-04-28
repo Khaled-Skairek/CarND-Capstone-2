@@ -63,7 +63,12 @@ cd ros
 catkin_make
 source devel/setup.sh
 roslaunch launch/styx.launch
+
+# Launch with eventlet.monkey_patch()
+# If the CPU resource is short, it would help us with running it.
+EVENTLET_MONKEY_PATCH=true roslaunch launch/styx.launch
 ```
+
 4. Run the simulator
 
 ### Real world testing
