@@ -104,17 +104,14 @@ class TLDetector(object):
             self.state = state
         elif self.state_count >= STATE_COUNT_THRESHOLD:
             if light_wp != NO_LIGHT:
-                #light_wp = light_wp if state == TrafficLight.RED else -1
                 if state != TrafficLight.RED:
                     light_wp = -light_wp  # >0: RED; <0: NOT RED!
 
             self.last_wp = light_wp
-            if DEBUG:
-                rospy.logwarn("tl_detector: publishing new  light_wp = %s +++++++++++++++++++++++",str(light_wp))            
+            rospy.logdebug("tl_detector: publishing new light_wp = %s",str(light_wp))
             self.upcoming_red_light_pub.publish(Int32(light_wp))
         else:
-            if DEBUG:
-                rospy.logwarn("tl_detector: publishing last light_wp = %s ***********************",str(self.last_wp))            
+            rospy.logdebug("tl_detector: publishing last light_wp = %s",str(self.last_wp))
             self.upcoming_red_light_pub.publish(Int32(self.last_wp))
         
         # only increase count if we are looking at a light

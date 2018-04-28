@@ -100,7 +100,7 @@ class TLClassifier(object):
     def visualize(self, image, boxes, classes, scores, thickness=2, font_size=0.5):
         height, width, channels = image.shape
         for i, score in enumerate(scores):
-            if score >= 0.5:
+            if score >= CONFIDENT_THRESHOLD:
                 colorIndex = classes[i] - 1
                 color = self.COLOR_ARRAY[colorIndex]
                 colorStr = TRAFFIC_LIGHT_COLORS[colorIndex]
