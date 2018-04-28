@@ -1,0 +1,20 @@
+name: traffic-light-classifier
+channels:
+    - https://conda.anaconda.org/menpo
+    - conda-forge
+dependencies:
+    - python=2.7.12
+    - opencv
+    - protobuf=2.6
+    - openblas
+    - jupyter
+    - numpy
+    - scipy
+    - cython
+    - pillow=4.3.0
+    - matplotlib
+    - lxml
+    - pip:
+        - pip
+        - tensorflow==1.4.0
+        - keras

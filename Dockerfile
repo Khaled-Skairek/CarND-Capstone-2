@@ -17,6 +17,7 @@ RUN apt-get upgrade -y
 
 # install python packages
 RUN apt-get install -y python-pip
+RUN pip install -U pip
 COPY requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
 
@@ -27,8 +28,11 @@ RUN apt-get install -y ros-$ROS_DISTRO-image-proc
 
 # socket io
 RUN apt-get install -y netbase
+RUN apt-get install -y less
 
-RUN mkdir /capstone
-VOLUME ["/capstone"]
+#RUN mkdir /capstone
+#VOLUME ["/capstone"]
 VOLUME ["/root/.ros/log/"]
 WORKDIR /capstone/ros
+
+EXPOSE 4567

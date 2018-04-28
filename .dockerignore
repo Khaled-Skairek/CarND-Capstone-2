@@ -1,0 +1,7 @@
+data/
+traffic_light_classifier/
+imgs/
+.idea/
+.git/
+bag_files/
+ros/

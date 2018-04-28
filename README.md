@@ -1,3 +1,14 @@
+# Udacity's Self-Driving Car Engineer Nanodegree Program
+
+## Team: YDriving
+
+- Yu Ishikawa: yuu.ishikawa at gmail dot com
+- Time Zone: UTC-07:00 (California)
+- GitHub repo: https://github.com/yu-iskw/CarND-Capstone
+
+[![Capture Video](./imgs/youtube-top.png)](https://www.youtube.com/watch?v=Ip-lVgMS4-Q)
+
+----
 This is the project repo for the final project of the Udacity Self-Driving Car Nanodegree: Programming a Real Self-Driving Car. For more information about the project, see the project introduction [here](https://classroom.udacity.com/nanodegrees/nd013/parts/6047fe34-d93c-4f50-8336-b70ef10cb4b2/modules/e1a23b06-329a-4684-a717-ad476f0d8dff/lessons/462c933d-9f24-42d3-8bdc-a08a5fc866e4/concepts/5ab4b122-83e6-436d-850f-9f4d26627fd9).
 
 Please use **one** of the two installation options, either native **or** docker installation.
@@ -53,7 +64,12 @@ cd ros
 catkin_make
 source devel/setup.sh
 roslaunch launch/styx.launch
+
+# Launch with eventlet.monkey_patch()
+# If the CPU resource is short, it would help us with running it.
+EVENTLET_MONKEY_PATCH=true roslaunch launch/styx.launch
 ```
+
 4. Run the simulator
 
 ### Real world testing

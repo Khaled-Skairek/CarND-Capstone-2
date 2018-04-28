@@ -1,0 +1,11 @@
+name: carnd-capstone
+channels:
+    - https://conda.anaconda.org/menpo
+    - conda-forge
+dependencies:
+    - python=2.7.12
+    - opencv
+    - jupyter
+    - pip:
+        - pip
+        - rosinstall==0.7.8

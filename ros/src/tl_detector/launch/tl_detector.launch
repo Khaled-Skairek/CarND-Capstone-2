@@ -1,4 +1,7 @@
 <?xml version="1.0"?>
 <launch>
     <node pkg="tl_detector" type="tl_detector.py" name="tl_detector" output="screen" cwd="node"/>
+
+    <!--Path to a trained model -->
+    <param name="model_name" type="str" value="light_classification/models/frozen_inference_graph_sim.pb" />
 </launch>
