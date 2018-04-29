@@ -2,7 +2,8 @@
 
 ## Team: YDriving
 
-- Yu Ishikawa: yuu.ishikawa at gmail dot com
+- Name: Yu Ishikawa
+- Email: yuu.ishikawa@gmail.com
 - Time Zone: UTC-07:00 (California)
 - GitHub repo: https://github.com/yu-iskw/CarND-Capstone
 
